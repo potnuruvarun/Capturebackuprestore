@@ -13,4 +13,9 @@
     <PackageReference Include="System.Data.SQLite" Version="1.0.119" />
   </ItemGroup>
 
+  <ItemGroup>
+    <ProjectReference Include="..\Helpers\Helpers.csproj" />
+    <ProjectReference Include="..\Restorebackup\Restorebackup.csproj" />
+  </ItemGroup>
+
 </Project>

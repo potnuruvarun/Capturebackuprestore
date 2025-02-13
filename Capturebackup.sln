@@ -5,6 +5,10 @@ VisualStudioVersion = 17.11.35327.3
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Capturebackup", "Capturebackup\Capturebackup.csproj", "{E73A0816-205F-4A6F-8944-36637AB9A2C9}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Restorebackup", "Restorebackup\Restorebackup.csproj", "{6203AA4E-EEA2-4419-ACC8-662232CE5ED2}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Helpers", "Helpers\Helpers.csproj", "{6AB32190-3F7A-43D9-9F6F-259E87FCD5ED}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -15,6 +19,14 @@ Global
 		{E73A0816-205F-4A6F-8944-36637AB9A2C9}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{E73A0816-205F-4A6F-8944-36637AB9A2C9}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{E73A0816-205F-4A6F-8944-36637AB9A2C9}.Release|Any CPU.Build.0 = Release|Any CPU
+		{6203AA4E-EEA2-4419-ACC8-662232CE5ED2}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{6203AA4E-EEA2-4419-ACC8-662232CE5ED2}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{6203AA4E-EEA2-4419-ACC8-662232CE5ED2}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{6203AA4E-EEA2-4419-ACC8-662232CE5ED2}.Release|Any CPU.Build.0 = Release|Any CPU
+		{6AB32190-3F7A-43D9-9F6F-259E87FCD5ED}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{6AB32190-3F7A-43D9-9F6F-259E87FCD5ED}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{6AB32190-3F7A-43D9-9F6F-259E87FCD5ED}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{6AB32190-3F7A-43D9-9F6F-259E87FCD5ED}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

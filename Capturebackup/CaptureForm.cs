@@ -11,45 +11,90 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Threading.Tasks;
 using System.Windows.Forms;
+using Restorebackup;
+using Helpers;
 
 namespace Capturebackup
 {
     public partial class CaptureForm : Form
     {
-        private string backupFilePath = @"C:\Users\sit363.SIT\Desktop\history_backup.txt";
-        private string chromeHistoryPath = $@"C:\Users\sit363.SIT\AppData\Local\Google\Chrome\User Data\Profile 18\History";
-        private string tempHistoryPath = Path.Combine(Path.GetTempPath(), "ChromeHistory.db");
-        private string chromeCookiesPath = $@"C:\Users\sit363.SIT\AppData\Local\Google\Chrome\User Data\Profile 18\Network\Cookies";
-        private string backupCookiesFilePath = @"C:\Users\sit363.SIT\Desktop\cookies_backup.txt"; // Backup path for cookies
-        private string tempCookiesPath = Path.Combine(Path.GetTempPath(), "CookiesCopy.db");
-        private string backupPasswordsFilePath = @"C:\Users\sit363.SIT\Desktop\passwords_backup.txt";
-        private string chromePasswordsPath = $@"C:\Users\sit363.SIT\AppData\Local\Google\Chrome\User Data\Profile 18\Login Data For Account";
-        private static string localStatePath = $@"C:\Users\sit363.SIT\AppData\Local\Google\Chrome\User Data\Local State";
-        private static string tempLoginDataPath = Path.Combine(Path.GetTempPath(), "LoginDataTemp.db");
-        private string chromeWebDataPath = $@"C:\Users\sit363.SIT\AppData\Local\Google\Chrome\User Data\Profile 18\Web Data";
-        private string backupWebDataFilePath = @"C:\Users\sit363.SIT\Desktop\chrome_webdata_backup.txt";
 
-
-
+        private FileSystemWatcher watcherChrome;
+        private FileSystemWatcher watcherEdge;
+        private FileSystemWatcher watcherFirefox;
+        private HashSet<string> capturedUrls = new HashSet<string>();
+        private const string lastCapturedTimeFile = "lastCapturedTime.txt";
+        private long lastCapturedTime = 0;
 
         public CaptureForm()
         {
             InitializeComponent();
+            LoadLastCapturedTime();
+            SetupFileWatcher();
         }
+        private void LoadLastCapturedTime()
+        {
+            if (File.Exists(lastCapturedTimeFile))
+            {
+                long.TryParse(File.ReadAllText(lastCapturedTimeFile), out lastCapturedTime);
+            }
+        }
+
+        private void SetupFileWatcher()
+        {
+            watcherChrome = new FileSystemWatcher
+            {
+                Path = Path.GetDirectoryName(ConstantUrls.chromeHistoryPath),
+                Filter = "History",
+                NotifyFilter = NotifyFilters.LastWrite | NotifyFilters.Size
+            };
+            watcherChrome.Changed += OnHistoryChanged;
+            watcherChrome.EnableRaisingEvents = true; // Start monitoring Chrome history
+
+            watcherEdge = new FileSystemWatcher
+            {
+                Path = Path.GetDirectoryName(ConstantUrls.edgeHistoryPath),
+                Filter = "History",
+                NotifyFilter = NotifyFilters.LastWrite | NotifyFilters.Size
+            };
+            watcherEdge.Changed += OnHistoryChanged;
+            watcherEdge.EnableRaisingEvents = true;
+
+            watcherFirefox = new FileSystemWatcher
+            {
+                Path = Path.GetDirectoryName(ConstantUrls.firefoxHistoryPath),
+                Filter = "places.sqlite",
+                NotifyFilter = NotifyFilters.LastWrite | NotifyFilters.Size
+            };
+            watcherFirefox.Changed += OnHistoryChanged;
+            watcherFirefox.EnableRaisingEvents = true;
+        }
+
+        private void OnHistoryChanged(object sender, FileSystemEventArgs e)
+        {
+            if (File.Exists(ConstantUrls.chromeHistoryPath))
+            {
+                System.Threading.Thread.Sleep(1000); // Wait for file to be fully written
+                CaptureAndBackupHistory(); // Automatically capture history when it changes
+            }
+        }
+
 
         private void button1_Click(object sender, EventArgs e)
         {
-            CaptureAndBackupHistory();
-            CaptureAndBackupcookies();
-            CaptureAndBackupPasswords();
-            //BackupWebData();
+            //CaptureBrowserHistory(ConstantUrls.chromeHistoryPath, ConstantUrls.tempHistoryPath, ConstantUrls.backupFilePath, "Chrome");
+            //CaptureBrowserHistory(ConstantUrls.firefoxHistoryPath, ConstantUrls.tempfirefoxPath, ConstantUrls.firefoxbackupFilePath, "Firefox");
+            //    CaptureAndBackupHistory();
+            //    //CaptureAndBackupcookies();
+            //    //CaptureAndBackupPasswords();
+            //    //BackupWebData();
         }
 
         private void button2_Click(object sender, EventArgs e)
         {
             RestoreHistory();
-            RestoreCookies();
-            RestorePasswords();
+            //RestoreCookies();
+            //RestorePasswords();
         }
 
         //CaptureAndBAckupHistory
@@ -57,33 +102,102 @@ namespace Capturebackup
         {
             try
             {
+                CaptureBrowserHistory(ConstantUrls.chromeHistoryPath, ConstantUrls.tempHistoryPath, ConstantUrls.backupFilePath, "Chrome");
+                CaptureBrowserHistory(ConstantUrls.edgeHistoryPath, ConstantUrls.tempedgePath, ConstantUrls.edgebackupFilePath, "Edge");
+                CaptureBrowserHistory(ConstantUrls.firefoxHistoryPath, ConstantUrls.tempfirefoxPath, ConstantUrls.firefoxbackupFilePath, "Firefox");
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show("Error: " + ex.Message, "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+        }
 
-                //// Ensure Chrome is closed before accessing the database
-                if (IsChromeRunning())
-                {
-                    MessageBox.Show("Please close Chrome before capturing history.", "Warning", MessageBoxButtons.OK, MessageBoxIcon.Warning);
-                    return;
-                }
-                //richTextBox1.Clear(); // Clear previous data
+        //private void CaptureBrowserHistory(string HistoryPath, string tempPath, string backupFilePath)
+        //{
+        //    try
+        //    {
+        //        Console.WriteLine(lastCapturedTimeFile);
+        //        File.Copy(HistoryPath, tempPath, true);
+        //        string connectionString = $"Data Source={tempPath};Version=3;";
+        //        StringBuilder historyData = new StringBuilder();
 
-                // Ensure Chrome is closed before copying
-                if (File.Exists(chromeHistoryPath))
-                {
-                    File.Copy(chromeHistoryPath, tempHistoryPath, true);
-                }
-                else
-                {
-                    MessageBox.Show("Chrome history file not found. Make sure Chrome is installed and used.", "Error", MessageBoxButtons.OK, MessageBoxIcon.Warning);
-                    return;
-                }
+        //        using (var connection = new SQLiteConnection(connectionString))
+        //        {
+        //            connection.Open();
+        //            string query = $"SELECT url, title, last_visit_time FROM urls WHERE last_visit_time > {lastCapturedTime} ORDER BY last_visit_time ASC";
 
-                string connectionString = $"Data Source={tempHistoryPath};Version=3;";
+        //            using (var command = new SQLiteCommand(query, connection))
+        //            using (var reader = command.ExecuteReader())
+        //            {
+        //                while (reader.Read())
+        //                {
+        //                    string url = reader["url"].ToString();
+        //                    string title = reader["title"].ToString();
+        //                    long lastVisitTime = Convert.ToInt64(reader["last_visit_time"]);
+        //                    DateTime lastVisit = ConvertWebkitTimestamp(lastVisitTime);
+
+        //                    // Only capture new URLs
+        //                    if (!capturedUrls.Contains(url))
+        //                    {
+        //                        capturedUrls.Add(url);
+        //                        historyData.AppendLine($"Title: {title}\nURL: {url}\nVisited On: {lastVisit}\n--------------------\n");
+
+        //                        // Update the last captured time
+        //                        lastCapturedTime = lastVisitTime;
+        //                    }
+        //                }
+        //            }
+        //        }
+
+        //        File.Delete(tempPath); // Cleanup temp file
+        //                               // Display data in TextBox
+        //        File.AppendAllText(backupFilePath, historyData.ToString());
+        //        if (richTextBox1.InvokeRequired)
+        //        {
+        //            richTextBox1.Invoke(new Action(() =>
+        //            {
+        //                richTextBox1.AppendText(historyData.ToString());
+        //            }));
+        //        }
+        //        else
+        //        {
+        //            richTextBox1.AppendText(historyData.ToString());
+        //        }
+        //        File.WriteAllText(lastCapturedTimeFile, lastCapturedTime.ToString());
+        //        //MessageBox.Show("Backup completed!", "Success", MessageBoxButtons.OK, MessageBoxIcon.Information);
+
+        //    }
+        //    catch (Exception ex)
+        //    {
+        //        MessageBox.Show("Error: " + ex.Message, "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+        //    }
+        //}
+
+        private void CaptureBrowserHistory(string historyPath, string tempPath, string backupFilePath, string browser)
+        {
+            try
+            {
+                Console.WriteLine(lastCapturedTimeFile);
+                File.Copy(historyPath, tempPath, true); // Copy DB file to avoid locking issues
+                string connectionString = $"Data Source={tempPath};Version=3;";
                 StringBuilder historyData = new StringBuilder();
 
                 using (var connection = new SQLiteConnection(connectionString))
                 {
                     connection.Open();
-                    string query = "SELECT url, title, last_visit_time FROM urls WHERE last_visit_time IS NOT NULL ORDER BY last_visit_time DESC LIMIT 50";
+                    string query = "";
+                    string lastVisitColumn = browser == "Firefox" ? "visit_date" : "last_visit_time";
+                    long firefoxTime = lastCapturedTime * 1000;
+                    if (browser == "Firefox")
+                    {
+                        query = $"SELECT url, title, visit_date FROM moz_places " +
+                                $"JOIN moz_historyvisits ON moz_places.id = moz_historyvisits.place_id " +
+                                $"WHERE visit_date > {firefoxTime} ORDER BY visit_date ASC";
+                    }
+                    else
+                    {
+                        query = $"SELECT url, title, last_visit_time FROM urls WHERE last_visit_time > {lastCapturedTime} ORDER BY last_visit_time ASC";
+                    }
 
                     using (var command = new SQLiteCommand(query, connection))
                     using (var reader = command.ExecuteReader())
@@ -92,19 +206,41 @@ namespace Capturebackup
                         {
                             string url = reader["url"].ToString();
                             string title = reader["title"].ToString();
-                            long lastVisitTime = Convert.ToInt64(reader["last_visit_time"]);
-                            DateTime lastVisit = ConvertWebkitTimestamp(lastVisitTime);
+                            long lastVisitTime = Convert.ToInt64(reader[lastVisitColumn]);
 
-                            historyData.AppendLine($"Title: {title}\nURL: {url}\nVisited On: {lastVisit}\n--------------------\n");
+                            DateTime lastVisit = browser == "Firefox"
+                                ? ConvertFirefoxTimestamp(lastVisitTime)
+                                : ConvertWebkitTimestamp(lastVisitTime);
+
+                            // Only capture new URLs
+                            if (!capturedUrls.Contains(url))
+                            {
+                                capturedUrls.Add(url);
+                                historyData.AppendLine($"Title: {title}\nURL: {url}\nVisited On: {lastVisit}\n--------------------\n");
+
+                                // Update last captured time
+                                lastCapturedTime = lastVisitTime;
+                            }
                         }
                     }
                 }
 
-                File.Delete(tempHistoryPath); // Cleanup temp file
-                // Display data in TextBox
-                File.WriteAllText(backupFilePath, historyData.ToString());
-                richTextBox1.Text += historyData.ToString();
-                MessageBox.Show("Backup completed!", "Success", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                File.Delete(tempPath); // Cleanup temp file
+
+                // Save data to backup
+                File.AppendAllText(backupFilePath, historyData.ToString());
+
+                // Update UI safely
+                if (richTextBox1.InvokeRequired)
+                {
+                    richTextBox1.Invoke(new Action(() => richTextBox1.AppendText(historyData.ToString())));
+                }
+                else
+                {
+                    richTextBox1.AppendText(historyData.ToString());
+                }
+
+                File.WriteAllText(lastCapturedTimeFile, lastCapturedTime.ToString());
 
             }
             catch (Exception ex)
@@ -113,10 +249,16 @@ namespace Capturebackup
             }
         }
 
+        private DateTime ConvertFirefoxTimestamp(long timestamp)
+        {
+            return DateTimeOffset.FromUnixTimeMilliseconds(timestamp / 1000).UtcDateTime;
+        }
+
+
         private static DateTime ConvertWebkitTimestamp(long webkitTimestamp)
         {
             DateTime epoch = new DateTime(1601, 1, 1, 0, 0, 0, DateTimeKind.Utc);
-            return epoch.AddMilliseconds(webkitTimestamp / 1000);
+            return epoch.AddTicks(webkitTimestamp * 10).ToLocalTime();
         }
 
         private void richTextBox1_TextChanged(object sender, EventArgs e)
@@ -127,96 +269,10 @@ namespace Capturebackup
 
         private void RestoreHistory()
         {
-            try
-            {
-                if (IsChromeRunning())
-                {
-                    MessageBox.Show("Please close Chrome before restoring history.", "Warning", MessageBoxButtons.OK, MessageBoxIcon.Warning);
-                    return;
-                }
 
-                if (!File.Exists(backupFilePath))
-                {
-                    MessageBox.Show("No backup file found!", "Error", MessageBoxButtons.OK, MessageBoxIcon.Warning);
-                    return;
-                }
-
-                // Read the backup content
-                string backupContent = File.ReadAllText(backupFilePath);
-                var entries = ParseBackupContent(backupContent);
-
-                if (!entries.Any())
-                {
-                    MessageBox.Show("No valid entries found in backup file.", "Error", MessageBoxButtons.OK, MessageBoxIcon.Warning);
-                    return;
-                }
-
-                // Make sure we have write access to Chrome history
-                if (!EnsureHistoryAccess())
-                {
-                    MessageBox.Show("Cannot access Chrome history file. Check permissions.", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
-                    return;
-                }
-
-                // Copy Chrome history to temp location
-                File.Copy(chromeHistoryPath, tempHistoryPath, true);
-
-                using (var connection = new SQLiteConnection($"Data Source={tempHistoryPath};Version=3;"))
-                {
-                    connection.Open();
-
-                    using (var transaction = connection.BeginTransaction())
-                    {
-                        try
-                        {
-                            // First, insert into visits table
-                            foreach (var entry in entries)
-                            {
-                                // Insert URL first and get its ID
-                                long urlId = InsertHistoryEntry(connection, entry);
-
-                                // Then insert corresponding visit
-                                InsertVisit(connection, urlId, entry.VisitTime);
-                            }
-
-                            transaction.Commit();
-                        }
-                        catch (Exception ex)
-                        {
-                            transaction.Rollback();
-                            throw new Exception($"Failed to insert entries: {ex.Message}");
-                        }
-                    }
-                }
-
-                // Replace the original history file
-                try
-                {
-                    // Ensure Chrome is fully closed
-                    KillAllChromeProcesses();
-
-                    // Wait a moment to ensure file handles are released
-                    System.Threading.Thread.Sleep(1000);
-
-                    File.Copy(tempHistoryPath, chromeHistoryPath, true);
-                    MessageBox.Show("History restored successfully!", "Success", MessageBoxButtons.OK, MessageBoxIcon.Information);
-                }
-                catch (Exception ex)
-                {
-                    throw new Exception($"Failed to copy history back to Chrome: {ex.Message}");
-                }
-                finally
-                {
-                    if (File.Exists(tempHistoryPath))
-                    {
-                        File.Delete(tempHistoryPath);
-                    }
-                }
-            }
-            catch (Exception ex)
-            {
-                MessageBox.Show($"Error restoring history: {ex.Message}", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
-            }
+            HistoryRestorer historymanager = new HistoryRestorer(ConstantUrls.chromeHistoryPath, ConstantUrls.backupFilePath, ConstantUrls.tempHistoryPath);
+            string result = historymanager.RestoreHistory();
+            MessageBox.Show(result, "Restore Status", MessageBoxButtons.OK, MessageBoxIcon.Information);
         }
 
         private long InsertHistoryEntry(SQLiteConnection connection, HistoryEntry entry)
@@ -323,7 +379,7 @@ namespace Capturebackup
             try
             {
                 // Try to open the file for reading and writing
-                using (var fs = new FileStream(chromeHistoryPath, FileMode.Open, FileAccess.ReadWrite, FileShare.None))
+                using (var fs = new FileStream(ConstantUrls.chromeHistoryPath, FileMode.Open, FileAccess.ReadWrite, FileShare.None))
                 {
                     return true;
                 }
@@ -360,9 +416,9 @@ namespace Capturebackup
                 }
 
                 // Backup cookies from Chrome's SQLite database
-                if (File.Exists(chromeCookiesPath))
+                if (File.Exists(ConstantUrls.chromeCookiesPath))
                 {
-                    File.Copy(chromeCookiesPath, tempCookiesPath, true);
+                    File.Copy(ConstantUrls.chromeCookiesPath, ConstantUrls.tempCookiesPath, true);
                 }
                 else
                 {
@@ -370,7 +426,7 @@ namespace Capturebackup
                     return;
                 }
 
-                string connectionString = $"Data Source={tempCookiesPath};Version=3;";
+                string connectionString = $"Data Source={ConstantUrls.tempCookiesPath};Version=3;";
                 StringBuilder cookiesData = new StringBuilder();
 
                 using (var connection = new SQLiteConnection(connectionString))
@@ -395,9 +451,9 @@ namespace Capturebackup
                 }
 
                 // Save cookies data to file
-                File.WriteAllText(backupCookiesFilePath, cookiesData.ToString());
+                File.WriteAllText(ConstantUrls.backupCookiesFilePath, cookiesData.ToString());
                 richTextBox1.Text += cookiesData.ToString();
-                File.Delete(tempCookiesPath); // Clean up temporary file
+                File.Delete(ConstantUrls.tempCookiesPath); // Clean up temporary file
 
                 MessageBox.Show("Cookies backed up successfully!", "Success", MessageBoxButtons.OK, MessageBoxIcon.Information);
             }
@@ -418,13 +474,13 @@ namespace Capturebackup
                     return;
                 }
 
-                if (!File.Exists(backupCookiesFilePath))
+                if (!File.Exists(ConstantUrls.backupCookiesFilePath))
                 {
                     MessageBox.Show("No backup file found!", "Error", MessageBoxButtons.OK, MessageBoxIcon.Warning);
                     return;
                 }
 
-                string[] cookieLines = File.ReadAllLines(backupCookiesFilePath);
+                string[] cookieLines = File.ReadAllLines(ConstantUrls.backupCookiesFilePath);
                 if (cookieLines.Length == 0)
                 {
                     MessageBox.Show("Backup file is empty.", "Error", MessageBoxButtons.OK, MessageBoxIcon.Warning);
@@ -432,18 +488,18 @@ namespace Capturebackup
                 }
 
                 // Check if the Cookies file exists
-                if (!File.Exists(chromeCookiesPath))
+                if (!File.Exists(ConstantUrls.chromeCookiesPath))
                 {
                     // If the cookies file does not exist, create a new one
-                    CreateEmptyCookiesDatabase(chromeCookiesPath);
+                    CreateEmptyCookiesDatabase(ConstantUrls.chromeCookiesPath);
                     MessageBox.Show("Chrome cookies file not found. A new cookies database has been created.");
                 }
 
 
                 // Copy Chrome cookies to a temp file for modification
-                File.Copy(chromeCookiesPath, tempCookiesPath, true);
+                File.Copy(ConstantUrls.chromeCookiesPath, ConstantUrls.tempCookiesPath, true);
 
-                using (var connection = new SQLiteConnection($"Data Source={tempCookiesPath};Version=3;"))
+                using (var connection = new SQLiteConnection($"Data Source={ConstantUrls.tempCookiesPath};Version=3;"))
                 {
                     connection.Open();
                     CreateCookiesTable(connection);
@@ -490,8 +546,8 @@ namespace Capturebackup
                 }
 
                 // Replace original cookies with modified ones
-                File.Copy(tempCookiesPath, chromeCookiesPath, true);
-                File.Delete(tempCookiesPath);
+                File.Copy(ConstantUrls.tempCookiesPath, ConstantUrls.chromeCookiesPath, true);
+                File.Delete(ConstantUrls.tempCookiesPath);
 
                 MessageBox.Show("Cookies restored successfully!");
             }
@@ -568,7 +624,7 @@ namespace Capturebackup
                 //richTextBox1.Clear(); // Clear previous data
 
                 // Ensure Login Data file exists
-                if (!File.Exists(chromePasswordsPath))
+                if (!File.Exists(ConstantUrls.chromePasswordsPath))
                 {
                     MessageBox.Show("Chrome Login Data file not found. Make sure Chrome is installed and used.", "Error", MessageBoxButtons.OK, MessageBoxIcon.Warning);
                     return;
@@ -576,7 +632,7 @@ namespace Capturebackup
 
                 // Copy Chrome's Login Data file to a temp file to prevent file locking
                 string tempLoginDataPath = Path.Combine(Path.GetTempPath(), "LoginDataTemp.db");
-                File.Copy(chromePasswordsPath, tempLoginDataPath, true);
+                File.Copy(ConstantUrls.chromePasswordsPath, tempLoginDataPath, true);
 
                 StringBuilder passwordData = new StringBuilder();
                 byte[] encryptionKey = GetChromeEncryptionKey();
@@ -613,7 +669,7 @@ namespace Capturebackup
                 File.Delete(tempLoginDataPath);
 
                 // Write captured password data to backup file
-                File.WriteAllText(backupPasswordsFilePath, passwordData.ToString());
+                File.WriteAllText(ConstantUrls.backupPasswordsFilePath, passwordData.ToString());
 
                 // Display data in TextBox for user to review
                 richTextBox1.Text += passwordData.ToString();
@@ -679,7 +735,7 @@ namespace Capturebackup
             try
             {
                 // Read Local State file
-                string localStateContent = File.ReadAllText(localStatePath);
+                string localStateContent = File.ReadAllText(ConstantUrls.localStatePath);
 
                 // Parse JSON
                 var localState = JsonConvert.DeserializeObject<dynamic>(localStateContent);
@@ -715,20 +771,20 @@ namespace Capturebackup
 
                 // Path for the backup file (assumed backup exists)
 
-                if (!File.Exists(backupFilePath))
+                if (!File.Exists(ConstantUrls.backupFilePath))
                 {
                     MessageBox.Show("Backup file not found.", "Error", MessageBoxButtons.OK, MessageBoxIcon.Warning);
                     return;
                 }
 
                 // Read backup data from file
-                string backupData = File.ReadAllText(backupFilePath);
+                string backupData = File.ReadAllText(ConstantUrls.backupFilePath);
 
                 // Copy the original login data to a temporary location for restoration
                 //string chromeLoginDataPath = @"C:\Users\YourUserName\AppData\Local\Google\Chrome\User Data\Default\Login Data";
-                File.Copy(chromePasswordsPath, tempLoginDataPath, true); // Copy to avoid file locking
+                File.Copy(ConstantUrls.chromePasswordsPath, ConstantUrls.tempLoginDataPath, true); // Copy to avoid file locking
 
-                using (var connection = new SQLiteConnection($"Data Source={tempLoginDataPath};Version=3;"))
+                using (var connection = new SQLiteConnection($"Data Source={ConstantUrls.tempLoginDataPath};Version=3;"))
                 {
                     connection.Open();
 
@@ -766,7 +822,7 @@ namespace Capturebackup
                 }
 
                 // Delete the temporary file after restoration
-                File.Delete(tempLoginDataPath);
+                File.Delete(ConstantUrls.tempLoginDataPath);
 
                 MessageBox.Show("Passwords restored successfully!", "Success", MessageBoxButtons.OK, MessageBoxIcon.Information);
             }
@@ -787,19 +843,19 @@ namespace Capturebackup
                 }
 
                 // Check if Login Data file exists, if not create it
-                if (!File.Exists(chromePasswordsPath))
+                if (!File.Exists(ConstantUrls.chromePasswordsPath))
                 {
                     CreateNewLoginDataFile();
                 }
 
-                if (!File.Exists(backupPasswordsFilePath))
+                if (!File.Exists(ConstantUrls.backupPasswordsFilePath))
                 {
                     MessageBox.Show("Backup file not found!", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
                     return;
                 }
 
                 // Read backup file
-                string[] backupLines = File.ReadAllLines(backupPasswordsFilePath);
+                string[] backupLines = File.ReadAllLines(ConstantUrls.backupPasswordsFilePath);
                 var entries = ParseBackupFile(backupLines);
 
                 if (!entries.Any())
@@ -816,7 +872,7 @@ namespace Capturebackup
                 }
 
                 string tempLoginDataPath = Path.Combine(Path.GetTempPath(), "LoginDataTemp.db");
-                File.Copy(chromePasswordsPath, tempLoginDataPath, true);
+                File.Copy(ConstantUrls.chromePasswordsPath, tempLoginDataPath, true);
 
                 using (var connection = new SQLiteConnection($"Data Source={tempLoginDataPath};Version=3;"))
                 {
@@ -846,7 +902,7 @@ namespace Capturebackup
 
                 try
                 {
-                    File.Copy(tempLoginDataPath, chromePasswordsPath, true);
+                    File.Copy(tempLoginDataPath, ConstantUrls.chromePasswordsPath, true);
                     MessageBox.Show("Passwords restored successfully!", "Success", MessageBoxButtons.OK, MessageBoxIcon.Information);
                 }
                 catch (Exception ex)
@@ -872,12 +928,12 @@ namespace Capturebackup
             try
             {
                 // Create the directory if it doesn't exist
-                Directory.CreateDirectory(Path.GetDirectoryName(chromePasswordsPath));
+                Directory.CreateDirectory(Path.GetDirectoryName(ConstantUrls.chromePasswordsPath));
 
                 // Create a new SQLite database
-                SQLiteConnection.CreateFile(chromePasswordsPath);
+                SQLiteConnection.CreateFile(ConstantUrls.chromePasswordsPath);
 
-                using (var connection = new SQLiteConnection($"Data Source={chromePasswordsPath};Version=3;"))
+                using (var connection = new SQLiteConnection($"Data Source={ConstantUrls.chromePasswordsPath};Version=3;"))
                 {
                     connection.Open();
                     CreateLoginsTableIfNotExists(connection);
@@ -1075,56 +1131,6 @@ namespace Capturebackup
                 MessageBox.Show($"Error restoring data: {ex.Message}", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
         }
-
-
-        private void BackupWebData()
-        {
-            try
-            {
-                // Copy Chrome's Web Data file to a temp file to prevent file locking
-                string tempWebDataPath = Path.Combine(Path.GetTempPath(), "WebDataTemp.db");
-                File.Copy(chromeWebDataPath, tempWebDataPath, true);
-
-                StringBuilder webData = new StringBuilder();
-
-                // Connect to the copied SQLite database
-                string connectionString = $"Data Source={tempWebDataPath};Version=3;";
-                using (var connection = new SQLiteConnection(connectionString))
-                {
-                    connection.Open();
-
-                    // Query to retrieve autofill data from the `autofill` table
-                    string query = "SELECT name, value FROM autofill";
-                    using (var command = new SQLiteCommand(query, connection))
-                    using (var reader = command.ExecuteReader())
-                    {
-                        while (reader.Read())
-                        {
-                            string name = reader["name"].ToString();
-                            string value = reader["value"].ToString();
-
-                            webData.AppendLine($"Field Name: {name}\nAutofill Value: {value}\n");
-                        }
-                    }
-
-                    connection.Close();
-                }
-
-                // Delete the temporary Web Data file after extraction
-                File.Delete(tempWebDataPath);
-
-                // Write captured autofill data to backup file
-                File.WriteAllText(backupWebDataFilePath, webData.ToString());
-
-                // Display data in TextBox for user to review
-                richTextBox1.Text += "\n" + webData.ToString();
-            }
-            catch (Exception ex)
-            {
-                MessageBox.Show($"Error capturing autofill data: {ex.Message}", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
-            }
-        }
-
 
         #endregion region
     }
