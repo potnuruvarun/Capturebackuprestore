@@ -1,16 +1,19 @@
 ﻿using System.Data.SQLite;
+using System.Diagnostics;
 
 namespace Restorebackup
 {
     public class HistoryRestorer
     {
 
+        private string browserName;
         private string chromeHistoryPath;
         private string backupFilePath;
         private string tempHistoryPath;
 
-        public HistoryRestorer(string chromePath, string backupPath, string tempPath)
+        public HistoryRestorer(string browser, string chromePath, string backupPath, string tempPath)
         {
+            browserName = browser;
             chromeHistoryPath = chromePath;
             backupFilePath = backupPath;
             tempHistoryPath = tempPath;
@@ -20,10 +23,10 @@ namespace Restorebackup
         {
             try
             {
-                if (IsChromeRunning())
-                {
-                    return "Please close Chrome before restoring history.";
-                }
+                //if (IsBrowserRunning())
+                //{
+                //    return "Please close Chrome before restoring history.";
+                //}
 
                 if (!File.Exists(backupFilePath))
                 {
@@ -57,8 +60,8 @@ namespace Restorebackup
                         {
                             foreach (var entry in entries)
                             {
-                                long urlId = InsertHistoryEntry(connection, entry);
-                                InsertVisit(connection, urlId, entry.VisitTime);
+                                long urlId = InsertHistoryEntry(connection, entry, browserName);
+                                InsertVisit(connection, urlId, entry.VisitTime, browserName);
                             }
 
                             transaction.Commit();
@@ -74,7 +77,7 @@ namespace Restorebackup
                 // Replace the original history file
                 try
                 {
-                    KillAllChromeProcesses();
+                    KillBrowserProcesses();
                     Thread.Sleep(1000);
                     File.Copy(tempHistoryPath, chromeHistoryPath, true);
                     return "History restored successfully!";
@@ -96,14 +99,30 @@ namespace Restorebackup
                 return $"Error restoring history: {ex.Message}";
             }
         }
-        private bool IsChromeRunning()
+        private bool IsBrowserRunning()
         {
-            return System.Diagnostics.Process.GetProcessesByName("chrome").Any();
+            string processName = browserName.ToLower() switch
+            {
+                "chrome" => "chrome",
+                "edge" => "msedge",
+                "firefox" => "firefox",
+                _ => ""
+            };
+
+            return Process.GetProcessesByName(processName).Any();
         }
 
-        private void KillAllChromeProcesses()
+        private void KillBrowserProcesses()
         {
-            foreach (var process in System.Diagnostics.Process.GetProcessesByName("chrome"))
+            string processName = browserName.ToLower() switch
+            {
+                "chrome" => "chrome",
+                "edge" => "msedge",
+                "firefox" => "firefox",
+                _ => ""
+            };
+
+            foreach (var process in Process.GetProcessesByName(processName))
             {
                 process.Kill();
             }
@@ -146,51 +165,97 @@ namespace Restorebackup
             return entries;
         }
 
-        private long InsertHistoryEntry(SQLiteConnection connection, HistoryEntry entry)
+        private long InsertHistoryEntry(SQLiteConnection connection, HistoryEntry entry, string browserType)
         {
             using (var command = new SQLiteCommand(connection))
             {
-                // First check if URL exists
-                command.CommandText = "SELECT id FROM urls WHERE url = @url";
-                command.Parameters.AddWithValue("@url", entry.Url);
-                var existingId = command.ExecuteScalar();
-
-                if (existingId != null)
+                if (browserType == "Firefox")
                 {
-                    return Convert.ToInt64(existingId);
-                }
+                    // Check if the URL already exists
+                    command.CommandText = "SELECT id FROM moz_places WHERE url = @url";
+                    command.Parameters.AddWithValue("@url", entry.Url);
+                    var existingId = command.ExecuteScalar();
 
-                // If URL doesn't exist, insert it
-                command.CommandText = @"
+                    if (existingId != null)
+                    {
+                        return Convert.ToInt64(existingId);
+                    }
+
+                    // Insert new URL into `moz_places`
+                    command.CommandText = @"
+                INSERT INTO moz_places (url, title, visit_count, last_visit_date) 
+                VALUES (@url, @title, 1, @lastVisitTime);
+                SELECT last_insert_rowid();";
+
+                    command.Parameters.Clear();
+                    command.Parameters.AddWithValue("@url", entry.Url);
+                    command.Parameters.AddWithValue("@title", entry.Title);
+                    command.Parameters.AddWithValue("@lastVisitTime", ConvertToFirefoxTimestamp(entry.VisitTime));
+
+                    return Convert.ToInt64(command.ExecuteScalar());
+                }
+                else // Chrome & Edge
+                {
+                    // Check if the URL exists
+                    command.CommandText = "SELECT id FROM urls WHERE url = @url";
+                    command.Parameters.AddWithValue("@url", entry.Url);
+                    var existingId = command.ExecuteScalar();
+
+                    if (existingId != null)
+                    {
+                        return Convert.ToInt64(existingId);
+                    }
+
+                    // Insert new URL into `urls`
+                    command.CommandText = @"
                 INSERT INTO urls (url, title, last_visit_time, visit_count, typed_count, hidden)
                 VALUES (@url, @title, @lastVisitTime, @visitCount, @typedCount, 0);
                 SELECT last_insert_rowid();";
 
-                command.Parameters.Clear();
-                command.Parameters.AddWithValue("@url", entry.Url);
-                command.Parameters.AddWithValue("@title", entry.Title);
-                command.Parameters.AddWithValue("@lastVisitTime", ConvertToWebkitTimestamp(entry.VisitTime));
-                command.Parameters.AddWithValue("@visitCount", 1);
-                command.Parameters.AddWithValue("@typedCount", 1);
+                    command.Parameters.Clear();
+                    command.Parameters.AddWithValue("@url", entry.Url);
+                    command.Parameters.AddWithValue("@title", entry.Title);
+                    command.Parameters.AddWithValue("@lastVisitTime", ConvertToWebkitTimestamp(entry.VisitTime));
+                    command.Parameters.AddWithValue("@visitCount", 1);
+                    command.Parameters.AddWithValue("@typedCount", 1);
 
-                return Convert.ToInt64(command.ExecuteScalar());
+                    return Convert.ToInt64(command.ExecuteScalar());
+                }
             }
         }
 
-        private void InsertVisit(SQLiteConnection connection, long urlId, DateTime visitTime)
+        private void InsertVisit(SQLiteConnection connection, long urlId, DateTime visitTime, string browserType)
         {
             using (var command = new SQLiteCommand(connection))
             {
-                command.CommandText = @"
-                INSERT INTO visits (url, visit_time, from_visit, transition, visit_duration)
+                if (browserType == "Firefox")
+                {
+                    command.CommandText = @"
+                INSERT INTO moz_historyvisits (place_id, visit_date) 
+                VALUES (@urlId, @visitTime)";
+
+                    command.Parameters.AddWithValue("@urlId", urlId);
+                    command.Parameters.AddWithValue("@visitTime", ConvertToFirefoxTimestamp(visitTime));
+                }
+                else // Chrome & Edge
+                {
+                    command.CommandText = @"
+                    INSERT INTO visits (url, visit_time, from_visit, transition, visit_duration)
                 VALUES (@urlId, @visitTime, 0, 805306368, 0)";
 
-                command.Parameters.AddWithValue("@urlId", urlId);
-                command.Parameters.AddWithValue("@visitTime", ConvertToWebkitTimestamp(visitTime));
+                    command.Parameters.AddWithValue("@urlId", urlId);
+                    command.Parameters.AddWithValue("@visitTime", ConvertToWebkitTimestamp(visitTime));
+                }
 
                 command.ExecuteNonQuery();
             }
         }
+
+        private long ConvertToFirefoxTimestamp(DateTime date)
+        {
+            return (long)(date.ToUniversalTime().Subtract(new DateTime(1970, 1, 1)).TotalMilliseconds) * 1000; // Convert to microseconds
+        }
+
 
         private long ConvertToWebkitTimestamp(DateTime date)
         {

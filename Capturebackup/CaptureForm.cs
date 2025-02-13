@@ -24,7 +24,7 @@ namespace Capturebackup
         private FileSystemWatcher watcherFirefox;
         private HashSet<string> capturedUrls = new HashSet<string>();
         private const string lastCapturedTimeFile = "lastCapturedTime.txt";
-        private long lastCapturedTime = 0;
+        private long lastCapturedTime;
 
         public CaptureForm()
         {
@@ -32,11 +32,33 @@ namespace Capturebackup
             LoadLastCapturedTime();
             SetupFileWatcher();
         }
+        //private void LoadLastCapturedTime()
+        //{
+        //    if (File.Exists(lastCapturedTimeFile))
+        //    {
+        //        long.TryParse(File.ReadAllText(lastCapturedTimeFile), out lastCapturedTime);
+        //    }
+        //}
+
         private void LoadLastCapturedTime()
         {
             if (File.Exists(lastCapturedTimeFile))
             {
-                long.TryParse(File.ReadAllText(lastCapturedTimeFile), out lastCapturedTime);
+                try
+                {
+                    using (StreamReader reader = new StreamReader(lastCapturedTimeFile))
+                    {
+                        string content = reader.ReadLine();
+                        if (long.TryParse(content, out long time))
+                        {
+                            lastCapturedTime = time;
+                        }
+                    }
+                }
+                catch (IOException ex)
+                {
+                    Console.WriteLine($"File is in use: {ex.Message}");
+                }
             }
         }
 
@@ -92,7 +114,7 @@ namespace Capturebackup
 
         private void button2_Click(object sender, EventArgs e)
         {
-            RestoreHistory();
+            RestoreAllHistories();
             //RestoreCookies();
             //RestorePasswords();
         }
@@ -105,6 +127,9 @@ namespace Capturebackup
                 CaptureBrowserHistory(ConstantUrls.chromeHistoryPath, ConstantUrls.tempHistoryPath, ConstantUrls.backupFilePath, "Chrome");
                 CaptureBrowserHistory(ConstantUrls.edgeHistoryPath, ConstantUrls.tempedgePath, ConstantUrls.edgebackupFilePath, "Edge");
                 CaptureBrowserHistory(ConstantUrls.firefoxHistoryPath, ConstantUrls.tempfirefoxPath, ConstantUrls.firefoxbackupFilePath, "Firefox");
+
+                //CaptureBrowserHistory(ConstantUrls.chromeHistoryPath, ConstantUrls.tempHistoryPath, ConstantUrls.backupFilePath);
+                //CaptureBrowserHistory(ConstantUrls.edgeHistoryPath, ConstantUrls.tempedgePath, ConstantUrls.edgebackupFilePath);
             }
             catch (Exception ex)
             {
@@ -178,6 +203,18 @@ namespace Capturebackup
             try
             {
                 Console.WriteLine(lastCapturedTimeFile);
+                if (File.Exists(lastCapturedTimeFile))
+                {
+                    string lastTimeText = File.ReadAllText(lastCapturedTimeFile);
+                    if (!long.TryParse(lastTimeText, out lastCapturedTime))
+                    {
+                        lastCapturedTime = 0; // Default if parsing fails
+                    }
+                }
+                else
+                {
+                    lastCapturedTime = 0;
+                }
                 File.Copy(historyPath, tempPath, true); // Copy DB file to avoid locking issues
                 string connectionString = $"Data Source={tempPath};Version=3;";
                 StringBuilder historyData = new StringBuilder();
@@ -187,12 +224,11 @@ namespace Capturebackup
                     connection.Open();
                     string query = "";
                     string lastVisitColumn = browser == "Firefox" ? "visit_date" : "last_visit_time";
-                    long firefoxTime = lastCapturedTime * 1000;
                     if (browser == "Firefox")
                     {
                         query = $"SELECT url, title, visit_date FROM moz_places " +
                                 $"JOIN moz_historyvisits ON moz_places.id = moz_historyvisits.place_id " +
-                                $"WHERE visit_date > {firefoxTime} ORDER BY visit_date ASC";
+                                $"WHERE visit_date > {lastCapturedTime * 1000000} ORDER BY visit_date ASC";
                     }
                     else
                     {
@@ -212,15 +248,19 @@ namespace Capturebackup
                                 ? ConvertFirefoxTimestamp(lastVisitTime)
                                 : ConvertWebkitTimestamp(lastVisitTime);
 
+                            // Always update lastCapturedTime to the latest timestamp
+                            if (lastVisitTime > lastCapturedTime)
+                            {
+                                lastCapturedTime = lastVisitTime;
+                            }
+
                             // Only capture new URLs
                             if (!capturedUrls.Contains(url))
                             {
                                 capturedUrls.Add(url);
                                 historyData.AppendLine($"Title: {title}\nURL: {url}\nVisited On: {lastVisit}\n--------------------\n");
-
-                                // Update last captured time
-                                lastCapturedTime = lastVisitTime;
                             }
+
                         }
                     }
                 }
@@ -234,24 +274,27 @@ namespace Capturebackup
                 if (richTextBox1.InvokeRequired)
                 {
                     richTextBox1.Invoke(new Action(() => richTextBox1.AppendText(historyData.ToString())));
+                    
                 }
                 else
                 {
                     richTextBox1.AppendText(historyData.ToString());
                 }
-
-                File.WriteAllText(lastCapturedTimeFile, lastCapturedTime.ToString());
-
             }
             catch (Exception ex)
             {
                 MessageBox.Show("Error: " + ex.Message, "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
+            finally
+            {
+                File.WriteAllText(lastCapturedTimeFile, lastCapturedTime.ToString());
+            }
+
         }
 
         private DateTime ConvertFirefoxTimestamp(long timestamp)
         {
-            return DateTimeOffset.FromUnixTimeMilliseconds(timestamp / 1000).UtcDateTime;
+            return DateTimeOffset.FromUnixTimeMilliseconds(timestamp / 1000).LocalDateTime;
         }
 
 
@@ -267,13 +310,16 @@ namespace Capturebackup
         }
 
 
-        private void RestoreHistory()
+      
+        private void RestoreAllHistories()
         {
+            string resultChrome = new HistoryRestorer("Chrome", ConstantUrls.chromeHistoryPath, ConstantUrls.backupFilePath, ConstantUrls.tempHistoryPath).RestoreHistory();
+            string resultEdge = new HistoryRestorer("Edge", ConstantUrls.edgeHistoryPath, ConstantUrls.edgebackupFilePath, ConstantUrls.tempedgePath).RestoreHistory();
+            string resultFirefox = new HistoryRestorer("Firefox", ConstantUrls.firefoxHistoryPath, ConstantUrls.firefoxbackupFilePath, ConstantUrls.tempfirefoxPath).RestoreHistory();
 
-            HistoryRestorer historymanager = new HistoryRestorer(ConstantUrls.chromeHistoryPath, ConstantUrls.backupFilePath, ConstantUrls.tempHistoryPath);
-            string result = historymanager.RestoreHistory();
-            MessageBox.Show(result, "Restore Status", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            MessageBox.Show("Sucessfully REstored");
         }
+
 
         private long InsertHistoryEntry(SQLiteConnection connection, HistoryEntry entry)
         {
