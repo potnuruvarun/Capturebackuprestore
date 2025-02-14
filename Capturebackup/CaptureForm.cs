@@ -25,41 +25,70 @@ namespace Capturebackup
         private HashSet<string> capturedUrls = new HashSet<string>();
         private const string lastCapturedTimeFile = "lastCapturedTime.txt";
         private long lastCapturedTime;
+        private long appStartTimeMicroseconds;
+
 
         public CaptureForm()
         {
             InitializeComponent();
+            appStartTimeMicroseconds = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds() * 1000;
             LoadLastCapturedTime();
             SetupFileWatcher();
         }
+
         //private void LoadLastCapturedTime()
         //{
         //    if (File.Exists(lastCapturedTimeFile))
         //    {
-        //        long.TryParse(File.ReadAllText(lastCapturedTimeFile), out lastCapturedTime);
+        //        try
+        //        {
+        //            using (StreamReader reader = new StreamReader(lastCapturedTimeFile))
+        //            {
+        //                string content = reader.ReadLine();
+        //                if (long.TryParse(content, out long time))
+        //                {
+        //                    lastCapturedTime = time;
+        //                }
+        //            }
+        //        }
+        //        catch (IOException ex)
+        //        {
+        //            Console.WriteLine($"File is in use: {ex.Message}");
+        //        }
+        //    }
+        //    else
+        //    {
+        //        lastCapturedTime = 0;
         //    }
         //}
-
         private void LoadLastCapturedTime()
         {
             if (File.Exists(lastCapturedTimeFile))
             {
                 try
                 {
-                    using (StreamReader reader = new StreamReader(lastCapturedTimeFile))
+                    string content = File.ReadAllText(lastCapturedTimeFile);
+                    if (long.TryParse(content, out long time) && time > 0)
                     {
-                        string content = reader.ReadLine();
-                        if (long.TryParse(content, out long time))
-                        {
-                            lastCapturedTime = time;
-                        }
+                        lastCapturedTime = time;
+                    }
+                    else
+                    {
+                        Console.WriteLine("[WARNING] Invalid lastCapturedTime found, resetting to 0.");
+                        lastCapturedTime = 0; // Reset to prevent invalid queries
                     }
                 }
-                catch (IOException ex)
+                catch (Exception ex)
                 {
-                    Console.WriteLine($"File is in use: {ex.Message}");
+                    Console.WriteLine($"[ERROR] Failed to read lastCapturedTime: {ex.Message}");
+                    lastCapturedTime = 0;
                 }
             }
+            else
+            {
+                lastCapturedTime = 0;
+            }
+            Console.WriteLine($"[DEBUG] Loaded lastCapturedTime: {lastCapturedTime}");
         }
 
         private void SetupFileWatcher()
@@ -128,8 +157,6 @@ namespace Capturebackup
                 CaptureBrowserHistory(ConstantUrls.edgeHistoryPath, ConstantUrls.tempedgePath, ConstantUrls.edgebackupFilePath, "Edge");
                 CaptureBrowserHistory(ConstantUrls.firefoxHistoryPath, ConstantUrls.tempfirefoxPath, ConstantUrls.firefoxbackupFilePath, "Firefox");
 
-                //CaptureBrowserHistory(ConstantUrls.chromeHistoryPath, ConstantUrls.tempHistoryPath, ConstantUrls.backupFilePath);
-                //CaptureBrowserHistory(ConstantUrls.edgeHistoryPath, ConstantUrls.tempedgePath, ConstantUrls.edgebackupFilePath);
             }
             catch (Exception ex)
             {
@@ -226,9 +253,10 @@ namespace Capturebackup
                     string lastVisitColumn = browser == "Firefox" ? "visit_date" : "last_visit_time";
                     if (browser == "Firefox")
                     {
+                        long queryStartTime = appStartTimeMicroseconds;
                         query = $"SELECT url, title, visit_date FROM moz_places " +
                                 $"JOIN moz_historyvisits ON moz_places.id = moz_historyvisits.place_id " +
-                                $"WHERE visit_date > {lastCapturedTime * 100000} ORDER BY visit_date ASC";
+                                $"WHERE visit_date > {queryStartTime} ORDER BY visit_date ASC";
                     }
                     else
                     {
@@ -274,7 +302,7 @@ namespace Capturebackup
                 if (richTextBox1.InvokeRequired)
                 {
                     richTextBox1.Invoke(new Action(() => richTextBox1.AppendText(historyData.ToString())));
-                    
+
                 }
                 else
                 {
@@ -309,75 +337,106 @@ namespace Capturebackup
 
         }
 
+        //private void RestoreAllHistories()
+        //{
+        //    string resultChrome = new HistoryRestorer("Chrome", ConstantUrls.chromeHistoryPath, ConstantUrls.backupFilePath, ConstantUrls.tempHistoryPath).RestoreHistory();
+        //    string resultEdge = new HistoryRestorer("Edge", ConstantUrls.edgeHistoryPath, ConstantUrls.edgebackupFilePath, ConstantUrls.tempedgePath).RestoreHistory();
+        //    string resultFirefox = new HistoryRestorer("Firefox", ConstantUrls.firefoxHistoryPath, ConstantUrls.firefoxbackupFilePath, ConstantUrls.tempfirefoxPath).RestoreHistory();
 
-      
+        //    MessageBox.Show("Sucessfully REstored");
+        //}
+
         private void RestoreAllHistories()
         {
-            string resultChrome = new HistoryRestorer("Chrome", ConstantUrls.chromeHistoryPath, ConstantUrls.backupFilePath, ConstantUrls.tempHistoryPath).RestoreHistory();
-            string resultEdge = new HistoryRestorer("Edge", ConstantUrls.edgeHistoryPath, ConstantUrls.edgebackupFilePath, ConstantUrls.tempedgePath).RestoreHistory();
-            string resultFirefox = new HistoryRestorer("Firefox", ConstantUrls.firefoxHistoryPath, ConstantUrls.firefoxbackupFilePath, ConstantUrls.tempfirefoxPath).RestoreHistory();
+            try
+            {
+                StopFileWatchers();
 
-            MessageBox.Show("Sucessfully REstored");
+                string resultChrome = new HistoryRestorer("Chrome", ConstantUrls.chromeHistoryPath, ConstantUrls.backupFilePath, ConstantUrls.tempHistoryPath).RestoreHistory();
+                string resultEdge = new HistoryRestorer("Edge", ConstantUrls.edgeHistoryPath, ConstantUrls.edgebackupFilePath, ConstantUrls.tempedgePath).RestoreHistory();
+                string resultFirefox = new HistoryRestorer("Firefox", ConstantUrls.firefoxHistoryPath, ConstantUrls.firefoxbackupFilePath, ConstantUrls.tempfirefoxPath).RestoreHistory();
+                DeleteBackupFile(ConstantUrls.backupFilePath);
+                DeleteBackupFile(ConstantUrls.edgebackupFilePath);
+                DeleteBackupFile(ConstantUrls.firefoxbackupFilePath);
+
+                // ✅ Step 2: Get the latest timestamp from restored history (not from backup)
+                long latestTimestamp = GetLatestTimestampFromHistory(ConstantUrls.chromeHistoryPath);
+                latestTimestamp = Math.Max(latestTimestamp, GetLatestTimestampFromHistory(ConstantUrls.edgeHistoryPath));
+                latestTimestamp = Math.Max(latestTimestamp, GetLatestTimestampFromHistory(ConstantUrls.firefoxHistoryPath));
+
+                // ✅ Step 3: Update lastCapturedTime.txt with the latest timestamp
+                File.WriteAllText(lastCapturedTimeFile, latestTimestamp.ToString());
+
+
+                MessageBox.Show("Successfully Restored");
+
+                // ✅ Step 4: Restart capture after a delay to only capture new history
+                Task.Delay(2000).ContinueWith(_ => StartFileWatchers());
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Restore failed: {ex.Message}");
+            }
         }
 
-
-        private long InsertHistoryEntry(SQLiteConnection connection, HistoryEntry entry)
+        private void DeleteBackupFile(string filePath)
         {
-            using (var command = new SQLiteCommand(connection))
+            if (File.Exists(filePath))
             {
-                // First check if URL exists
-                command.CommandText = "SELECT id FROM urls WHERE url = @url";
-                command.Parameters.AddWithValue("@url", entry.Url);
-                var existingId = command.ExecuteScalar();
+                File.Delete(filePath);
+            }
+        }
 
-                if (existingId != null)
+        private void StopFileWatchers()
+        {
+            watcherChrome.EnableRaisingEvents = false;
+            watcherEdge.EnableRaisingEvents = false;
+            watcherFirefox.EnableRaisingEvents = false;
+        }
+
+        private void StartFileWatchers()
+        {
+            watcherChrome.EnableRaisingEvents = true;
+            watcherEdge.EnableRaisingEvents = true;
+            watcherFirefox.EnableRaisingEvents = true;
+        }
+        private long GetLatestTimestampFromHistory(string historyPath)
+        {
+
+            long latestTimestamp = 0;
+            string tempPath = Path.Combine(Path.GetTempPath(), Path.GetFileName(historyPath));
+
+            try
+            {
+                File.Copy(historyPath, tempPath, true); // Copy DB to avoid lock issues
+                using (var connection = new SQLiteConnection($"Data Source={tempPath};Version=3;"))
                 {
-                    return Convert.ToInt64(existingId);
+                    connection.Open();
+                    string query = "SELECT MAX(last_visit_time) FROM urls"; // Chrome/Edge
+                    if (historyPath.Contains("Firefox"))
+                        query = "SELECT MAX(visit_date) FROM moz_historyvisits"; // Firefox
+
+                    using (var command = new SQLiteCommand(query, connection))
+                    {
+                        object result = command.ExecuteScalar();
+                        if (result != DBNull.Value && result != null)
+                        {
+                            latestTimestamp = Convert.ToInt64(result);
+                        }
+                    }
                 }
-
-                // If URL doesn't exist, insert it
-                command.CommandText = @"
-                INSERT INTO urls (url, title, last_visit_time, visit_count, typed_count, hidden)
-                VALUES (@url, @title, @lastVisitTime, @visitCount, @typedCount, 0);
-                SELECT last_insert_rowid();";
-
-                command.Parameters.Clear();
-                command.Parameters.AddWithValue("@url", entry.Url);
-                command.Parameters.AddWithValue("@title", entry.Title);
-                command.Parameters.AddWithValue("@lastVisitTime", ConvertToWebkitTimestamp(entry.VisitTime));
-                command.Parameters.AddWithValue("@visitCount", 1);
-                command.Parameters.AddWithValue("@typedCount", 1);
-
-                return Convert.ToInt64(command.ExecuteScalar());
             }
-        }
-
-        private void InsertVisit(SQLiteConnection connection, long urlId, DateTime visitTime)
-        {
-            using (var command = new SQLiteCommand(connection))
+            catch (Exception ex)
             {
-                command.CommandText = @"
-                INSERT INTO visits (url, visit_time, from_visit, transition, visit_duration)
-                VALUES (@urlId, @visitTime, 0, 805306368, 0)";
-
-                command.Parameters.AddWithValue("@urlId", urlId);
-                command.Parameters.AddWithValue("@visitTime", ConvertToWebkitTimestamp(visitTime));
-
-                command.ExecuteNonQuery();
+                MessageBox.Show($"Error getting latest timestamp: {ex.Message}");
             }
-        }
-
-        private void KillAllChromeProcesses()
-        {
-            foreach (var process in Process.GetProcessesByName("chrome"))
+            finally
             {
-                try
-                {
-                    process.Kill();
-                    process.WaitForExit(3000);
-                }
-                catch { }
+                if (File.Exists(tempPath))
+                    File.Delete(tempPath);
             }
+
+            return latestTimestamp;
         }
 
         private class HistoryEntry

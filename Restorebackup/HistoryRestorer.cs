@@ -23,10 +23,6 @@ namespace Restorebackup
         {
             try
             {
-                //if (IsBrowserRunning())
-                //{
-                //    return "Please close Chrome before restoring history.";
-                //}
 
                 if (!File.Exists(backupFilePath))
                 {
@@ -63,7 +59,6 @@ namespace Restorebackup
                                 long urlId = InsertHistoryEntry(connection, entry, browserName);
                                 InsertVisit(connection, urlId, entry.VisitTime, browserName);
                             }
-
                             transaction.Commit();
                         }
                         catch (Exception ex)
@@ -80,6 +75,7 @@ namespace Restorebackup
                     KillBrowserProcesses();
                     Thread.Sleep(1000);
                     File.Copy(tempHistoryPath, chromeHistoryPath, true);
+                    //CleanupFirefoxCache(chromeHistoryPath);
                     return "History restored successfully!";
                 }
                 catch (Exception ex)
@@ -98,18 +94,6 @@ namespace Restorebackup
             {
                 return $"Error restoring history: {ex.Message}";
             }
-        }
-        private bool IsBrowserRunning()
-        {
-            string processName = browserName.ToLower() switch
-            {
-                "chrome" => "chrome",
-                "edge" => "msedge",
-                "firefox" => "firefox",
-                _ => ""
-            };
-
-            return Process.GetProcessesByName(processName).Any();
         }
 
         private void KillBrowserProcesses()
@@ -183,15 +167,14 @@ namespace Restorebackup
 
                     // Insert new URL into `moz_places`
                     command.CommandText = @"
-                INSERT INTO moz_places (url, title, visit_count, last_visit_date) 
-                VALUES (@url, @title, 1, @lastVisitTime);
-                SELECT last_insert_rowid();";
+                       INSERT INTO moz_places (url, title, visit_count, last_visit_date) 
+                       VALUES (@url, @title, 1, @lastVisitTime);
+                       SELECT last_insert_rowid();";
 
                     command.Parameters.Clear();
                     command.Parameters.AddWithValue("@url", entry.Url);
                     command.Parameters.AddWithValue("@title", entry.Title);
                     command.Parameters.AddWithValue("@lastVisitTime", ConvertToFirefoxTimestamp(entry.VisitTime));
-
                     return Convert.ToInt64(command.ExecuteScalar());
                 }
                 else // Chrome & Edge
@@ -231,11 +214,12 @@ namespace Restorebackup
                 if (browserType == "Firefox")
                 {
                     command.CommandText = @"
-                INSERT INTO moz_historyvisits (place_id, visit_date) 
-                VALUES (@urlId, @visitTime)";
+                   INSERT INTO moz_historyvisits (place_id, visit_date) 
+                   VALUES (@urlId, @visitTime)";
 
                     command.Parameters.AddWithValue("@urlId", urlId);
                     command.Parameters.AddWithValue("@visitTime", ConvertToFirefoxTimestamp(visitTime));
+                    command.ExecuteNonQuery();
                 }
                 else // Chrome & Edge
                 {
@@ -250,7 +234,6 @@ namespace Restorebackup
                 command.ExecuteNonQuery();
             }
         }
-
         private long ConvertToFirefoxTimestamp(DateTime date)
         {
             return (long)(date.ToUniversalTime().Subtract(new DateTime(1970, 1, 1)).TotalMilliseconds) * 1000; // Convert to microseconds
