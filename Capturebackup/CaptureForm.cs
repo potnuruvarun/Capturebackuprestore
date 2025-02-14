@@ -228,7 +228,7 @@ namespace Capturebackup
                     {
                         query = $"SELECT url, title, visit_date FROM moz_places " +
                                 $"JOIN moz_historyvisits ON moz_places.id = moz_historyvisits.place_id " +
-                                $"WHERE visit_date > {lastCapturedTime * 1000000} ORDER BY visit_date ASC";
+                                $"WHERE visit_date > {lastCapturedTime * 100000} ORDER BY visit_date ASC";
                     }
                     else
                     {
@@ -251,7 +251,7 @@ namespace Capturebackup
                             // Always update lastCapturedTime to the latest timestamp
                             if (lastVisitTime > lastCapturedTime)
                             {
-                                lastCapturedTime = lastVisitTime;
+                                lastCapturedTime = browser == "Firefox" ? lastVisitTime / 1000 : lastVisitTime;
                             }
 
                             // Only capture new URLs
