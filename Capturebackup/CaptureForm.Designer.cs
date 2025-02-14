@@ -28,57 +28,59 @@
         /// </summary>
         private void InitializeComponent()
         {
-            button1 = new Button();
             richTextBox1 = new RichTextBox();
             button2 = new Button();
+            button1 = new Button();
             SuspendLayout();
-            // 
-            // button1
-            // 
-            button1.Location = new Point(27, 12);
-            button1.Name = "button1";
-            button1.Size = new Size(94, 29);
-            button1.TabIndex = 0;
-            button1.Text = "Capture";
-            button1.UseVisualStyleBackColor = true;
-            button1.Click += button1_Click;
             // 
             // richTextBox1
             // 
-            richTextBox1.Location = new Point(52, 108);
+            richTextBox1.Location = new Point(46, 81);
+            richTextBox1.Margin = new Padding(3, 2, 3, 2);
             richTextBox1.Name = "richTextBox1";
-            richTextBox1.Size = new Size(1209, 490);
+            richTextBox1.Size = new Size(1058, 368);
             richTextBox1.TabIndex = 0;
             richTextBox1.Text = "";
             richTextBox1.TextChanged += richTextBox1_TextChanged;
             // 
             // button2
             // 
-            button2.Location = new Point(711, 12);
+            button2.Location = new Point(887, 26);
+            button2.Margin = new Padding(3, 2, 3, 2);
             button2.Name = "button2";
-            button2.Size = new Size(94, 29);
+            button2.Size = new Size(82, 22);
             button2.TabIndex = 1;
             button2.Text = "Restore";
             button2.UseVisualStyleBackColor = true;
             button2.Click += button2_Click;
             // 
+            // button1
+            // 
+            button1.Location = new Point(114, 32);
+            button1.Name = "button1";
+            button1.Size = new Size(75, 23);
+            button1.TabIndex = 2;
+            button1.Text = "button1";
+            button1.UseVisualStyleBackColor = true;
+            button1.Click += button1_Click;
+            // 
             // CaptureForm
             // 
-            AutoScaleDimensions = new SizeF(8F, 20F);
+            AutoScaleDimensions = new SizeF(7F, 15F);
             AutoScaleMode = AutoScaleMode.Font;
-            ClientSize = new Size(1338, 610);
+            ClientSize = new Size(1171, 458);
+            Controls.Add(button1);
             Controls.Add(button2);
             Controls.Add(richTextBox1);
-            Controls.Add(button1);
+            Margin = new Padding(3, 2, 3, 2);
             Name = "CaptureForm";
             Text = "CaptureForm";
             ResumeLayout(false);
         }
 
         #endregion
-
-        private Button button1;
         private RichTextBox richTextBox1;
         private Button button2;
+        private Button button1;
     }
 }

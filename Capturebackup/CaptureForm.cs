@@ -23,72 +23,14 @@ namespace Capturebackup
         private FileSystemWatcher watcherEdge;
         private FileSystemWatcher watcherFirefox;
         private HashSet<string> capturedUrls = new HashSet<string>();
-        private const string lastCapturedTimeFile = "lastCapturedTime.txt";
         private long lastCapturedTime;
         private long appStartTimeMicroseconds;
-
 
         public CaptureForm()
         {
             InitializeComponent();
-            appStartTimeMicroseconds = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds() * 1000;
-            LoadLastCapturedTime();
-            SetupFileWatcher();
-        }
-
-        //private void LoadLastCapturedTime()
-        //{
-        //    if (File.Exists(lastCapturedTimeFile))
-        //    {
-        //        try
-        //        {
-        //            using (StreamReader reader = new StreamReader(lastCapturedTimeFile))
-        //            {
-        //                string content = reader.ReadLine();
-        //                if (long.TryParse(content, out long time))
-        //                {
-        //                    lastCapturedTime = time;
-        //                }
-        //            }
-        //        }
-        //        catch (IOException ex)
-        //        {
-        //            Console.WriteLine($"File is in use: {ex.Message}");
-        //        }
-        //    }
-        //    else
-        //    {
-        //        lastCapturedTime = 0;
-        //    }
-        //}
-        private void LoadLastCapturedTime()
-        {
-            if (File.Exists(lastCapturedTimeFile))
-            {
-                try
-                {
-                    string content = File.ReadAllText(lastCapturedTimeFile);
-                    if (long.TryParse(content, out long time) && time > 0)
-                    {
-                        lastCapturedTime = time;
-                    }
-                    else
-                    {
-                        Console.WriteLine("[WARNING] Invalid lastCapturedTime found, resetting to 0.");
-                        lastCapturedTime = 0; // Reset to prevent invalid queries
-                    }
-                }
-                catch (Exception ex)
-                {
-                    Console.WriteLine($"[ERROR] Failed to read lastCapturedTime: {ex.Message}");
-                    lastCapturedTime = 0;
-                }
-            }
-            else
-            {
-                lastCapturedTime = 0;
-            }
-            Console.WriteLine($"[DEBUG] Loaded lastCapturedTime: {lastCapturedTime}");
+            //appStartTimeMicroseconds = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds() * 1000;
+            //SetupFileWatcher();
         }
 
         private void SetupFileWatcher()
@@ -131,16 +73,6 @@ namespace Capturebackup
         }
 
 
-        private void button1_Click(object sender, EventArgs e)
-        {
-            //CaptureBrowserHistory(ConstantUrls.chromeHistoryPath, ConstantUrls.tempHistoryPath, ConstantUrls.backupFilePath, "Chrome");
-            //CaptureBrowserHistory(ConstantUrls.firefoxHistoryPath, ConstantUrls.tempfirefoxPath, ConstantUrls.firefoxbackupFilePath, "Firefox");
-            //    CaptureAndBackupHistory();
-            //    //CaptureAndBackupcookies();
-            //    //CaptureAndBackupPasswords();
-            //    //BackupWebData();
-        }
-
         private void button2_Click(object sender, EventArgs e)
         {
             RestoreAllHistories();
@@ -163,85 +95,10 @@ namespace Capturebackup
                 MessageBox.Show("Error: " + ex.Message, "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
         }
-
-        //private void CaptureBrowserHistory(string HistoryPath, string tempPath, string backupFilePath)
-        //{
-        //    try
-        //    {
-        //        Console.WriteLine(lastCapturedTimeFile);
-        //        File.Copy(HistoryPath, tempPath, true);
-        //        string connectionString = $"Data Source={tempPath};Version=3;";
-        //        StringBuilder historyData = new StringBuilder();
-
-        //        using (var connection = new SQLiteConnection(connectionString))
-        //        {
-        //            connection.Open();
-        //            string query = $"SELECT url, title, last_visit_time FROM urls WHERE last_visit_time > {lastCapturedTime} ORDER BY last_visit_time ASC";
-
-        //            using (var command = new SQLiteCommand(query, connection))
-        //            using (var reader = command.ExecuteReader())
-        //            {
-        //                while (reader.Read())
-        //                {
-        //                    string url = reader["url"].ToString();
-        //                    string title = reader["title"].ToString();
-        //                    long lastVisitTime = Convert.ToInt64(reader["last_visit_time"]);
-        //                    DateTime lastVisit = ConvertWebkitTimestamp(lastVisitTime);
-
-        //                    // Only capture new URLs
-        //                    if (!capturedUrls.Contains(url))
-        //                    {
-        //                        capturedUrls.Add(url);
-        //                        historyData.AppendLine($"Title: {title}\nURL: {url}\nVisited On: {lastVisit}\n--------------------\n");
-
-        //                        // Update the last captured time
-        //                        lastCapturedTime = lastVisitTime;
-        //                    }
-        //                }
-        //            }
-        //        }
-
-        //        File.Delete(tempPath); // Cleanup temp file
-        //                               // Display data in TextBox
-        //        File.AppendAllText(backupFilePath, historyData.ToString());
-        //        if (richTextBox1.InvokeRequired)
-        //        {
-        //            richTextBox1.Invoke(new Action(() =>
-        //            {
-        //                richTextBox1.AppendText(historyData.ToString());
-        //            }));
-        //        }
-        //        else
-        //        {
-        //            richTextBox1.AppendText(historyData.ToString());
-        //        }
-        //        File.WriteAllText(lastCapturedTimeFile, lastCapturedTime.ToString());
-        //        //MessageBox.Show("Backup completed!", "Success", MessageBoxButtons.OK, MessageBoxIcon.Information);
-
-        //    }
-        //    catch (Exception ex)
-        //    {
-        //        MessageBox.Show("Error: " + ex.Message, "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
-        //    }
-        //}
-
         private void CaptureBrowserHistory(string historyPath, string tempPath, string backupFilePath, string browser)
         {
             try
             {
-                Console.WriteLine(lastCapturedTimeFile);
-                if (File.Exists(lastCapturedTimeFile))
-                {
-                    string lastTimeText = File.ReadAllText(lastCapturedTimeFile);
-                    if (!long.TryParse(lastTimeText, out lastCapturedTime))
-                    {
-                        lastCapturedTime = 0; // Default if parsing fails
-                    }
-                }
-                else
-                {
-                    lastCapturedTime = 0;
-                }
                 File.Copy(historyPath, tempPath, true); // Copy DB file to avoid locking issues
                 string connectionString = $"Data Source={tempPath};Version=3;";
                 StringBuilder historyData = new StringBuilder();
@@ -251,16 +108,19 @@ namespace Capturebackup
                     connection.Open();
                     string query = "";
                     string lastVisitColumn = browser == "Firefox" ? "visit_date" : "last_visit_time";
+                    //long queryStartTime = appStartTimeMicroseconds;
+                    long queryStartTime = browser == "Firefox"
+                ? appStartTimeMicroseconds  // Firefox uses Unix microseconds
+                : ConvertToWebkitTimestamp(appStartTimeMicroseconds);
                     if (browser == "Firefox")
                     {
-                        long queryStartTime = appStartTimeMicroseconds;
                         query = $"SELECT url, title, visit_date FROM moz_places " +
                                 $"JOIN moz_historyvisits ON moz_places.id = moz_historyvisits.place_id " +
                                 $"WHERE visit_date > {queryStartTime} ORDER BY visit_date ASC";
                     }
                     else
                     {
-                        query = $"SELECT url, title, last_visit_time FROM urls WHERE last_visit_time > {lastCapturedTime} ORDER BY last_visit_time ASC";
+                        query = $"SELECT url, title, last_visit_time FROM urls WHERE last_visit_time > {queryStartTime} ORDER BY last_visit_time ASC";
                     }
 
                     using (var command = new SQLiteCommand(query, connection))
@@ -313,18 +173,12 @@ namespace Capturebackup
             {
                 MessageBox.Show("Error: " + ex.Message, "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
-            finally
-            {
-                File.WriteAllText(lastCapturedTimeFile, lastCapturedTime.ToString());
-            }
-
         }
 
         private DateTime ConvertFirefoxTimestamp(long timestamp)
         {
             return DateTimeOffset.FromUnixTimeMilliseconds(timestamp / 1000).LocalDateTime;
         }
-
 
         private static DateTime ConvertWebkitTimestamp(long webkitTimestamp)
         {
@@ -336,15 +190,6 @@ namespace Capturebackup
         {
 
         }
-
-        //private void RestoreAllHistories()
-        //{
-        //    string resultChrome = new HistoryRestorer("Chrome", ConstantUrls.chromeHistoryPath, ConstantUrls.backupFilePath, ConstantUrls.tempHistoryPath).RestoreHistory();
-        //    string resultEdge = new HistoryRestorer("Edge", ConstantUrls.edgeHistoryPath, ConstantUrls.edgebackupFilePath, ConstantUrls.tempedgePath).RestoreHistory();
-        //    string resultFirefox = new HistoryRestorer("Firefox", ConstantUrls.firefoxHistoryPath, ConstantUrls.firefoxbackupFilePath, ConstantUrls.tempfirefoxPath).RestoreHistory();
-
-        //    MessageBox.Show("Sucessfully REstored");
-        //}
 
         private void RestoreAllHistories()
         {
@@ -358,16 +203,6 @@ namespace Capturebackup
                 DeleteBackupFile(ConstantUrls.backupFilePath);
                 DeleteBackupFile(ConstantUrls.edgebackupFilePath);
                 DeleteBackupFile(ConstantUrls.firefoxbackupFilePath);
-
-                // ✅ Step 2: Get the latest timestamp from restored history (not from backup)
-                long latestTimestamp = GetLatestTimestampFromHistory(ConstantUrls.chromeHistoryPath);
-                latestTimestamp = Math.Max(latestTimestamp, GetLatestTimestampFromHistory(ConstantUrls.edgeHistoryPath));
-                latestTimestamp = Math.Max(latestTimestamp, GetLatestTimestampFromHistory(ConstantUrls.firefoxHistoryPath));
-
-                // ✅ Step 3: Update lastCapturedTime.txt with the latest timestamp
-                File.WriteAllText(lastCapturedTimeFile, latestTimestamp.ToString());
-
-
                 MessageBox.Show("Successfully Restored");
 
                 // ✅ Step 4: Restart capture after a delay to only capture new history
@@ -439,72 +274,24 @@ namespace Capturebackup
             return latestTimestamp;
         }
 
-        private class HistoryEntry
+
+        private long ConvertToWebkitTimestamp(long unixMicroseconds)
         {
-            public string Url { get; set; }
-            public string Title { get; set; }
-            public DateTime VisitTime { get; set; }
+            // WebKit timestamps start from January 1, 1601 (Unix timestamps start from 1970)
+            DateTime webkitEpoch = new DateTime(1601, 1, 1, 0, 0, 0, DateTimeKind.Utc);
+            DateTime unixEpoch = new DateTime(1970, 1, 1, 0, 0, 0, DateTimeKind.Utc);
+
+            // Convert Unix microseconds to DateTime
+            DateTime dateTime = unixEpoch.AddMilliseconds(unixMicroseconds / 1000.0);
+
+            // Convert to WebKit timestamp (100-nanosecond intervals since 1601)
+            return (long)(dateTime - webkitEpoch).TotalMilliseconds * 1000;
         }
 
-        private List<HistoryEntry> ParseBackupContent(string content)
-        {
-            var entries = new List<HistoryEntry>();
-            var lines = content.Split(new[] { "\n" }, StringSplitOptions.RemoveEmptyEntries);
-
-            HistoryEntry currentEntry = null;
-            foreach (var line in lines)
-            {
-                if (line.StartsWith("Title: "))
-                {
-                    currentEntry = new HistoryEntry();
-                    currentEntry.Title = line.Substring(7).Trim();
-                }
-                else if (line.StartsWith("URL: ") && currentEntry != null)
-                {
-                    currentEntry.Url = line.Substring(5).Trim();
-                }
-                else if (line.StartsWith("Visited On: ") && currentEntry != null)
-                {
-                    if (DateTime.TryParse(line.Substring(11).Trim(), out DateTime visitTime))
-                    {
-                        currentEntry.VisitTime = visitTime;
-                        entries.Add(currentEntry);
-                        currentEntry = null;
-                    }
-                }
-            }
-
-            return entries;
-        }
-
-
-
-        private bool EnsureHistoryAccess()
-        {
-            try
-            {
-                // Try to open the file for reading and writing
-                using (var fs = new FileStream(ConstantUrls.chromeHistoryPath, FileMode.Open, FileAccess.ReadWrite, FileShare.None))
-                {
-                    return true;
-                }
-            }
-            catch
-            {
-                return false;
-            }
-        }
-
-        private long ConvertToWebkitTimestamp(DateTime date)
-        {
-            var epoch = new DateTime(1601, 1, 1, 0, 0, 0, DateTimeKind.Utc);
-            return (long)((date.ToUniversalTime() - epoch).TotalMicroseconds);
-        }
         private bool IsChromeRunning()
         {
             return Process.GetProcessesByName("chrome").Length > 0;
         }
-
 
 
 
@@ -712,38 +499,25 @@ namespace Capturebackup
         }
         #endregion
 
+        private void button1_Click(object sender, EventArgs e)
+        {
+            //CaptureAndBackupPasswords(ConstantUrls.chromePasswordsPath, ConstantUrls.backupPasswordsFilePath, ConstantUrls.tempLoginDataPath, "Chrome");
+            //CaptureAndBackupPasswords(ConstantUrls.edgePasswordsPath, ConstantUrls.edgebackupPasswordsFilePath, ConstantUrls.tempedgeDataPath, "Edge");
+            ExtractFirefoxPasswords(ConstantUrls.firefoxPasswordslogin);
+        }
 
         #region password
-        private void CaptureAndBackupPasswords()
-
+        private void CaptureAndBackupPasswords(string passwordpath, string backupFilePath, string tempdb, string browser)
         {
             try
             {
-                // Ensure Chrome is closed before capturing passwords
-                if (IsChromeRunning())
-                {
-                    MessageBox.Show("Please close Chrome before capturing passwords.", "Warning", MessageBoxButtons.OK, MessageBoxIcon.Warning);
-                    return;
-                }
-
-                //richTextBox1.Clear(); // Clear previous data
-
-                // Ensure Login Data file exists
-                if (!File.Exists(ConstantUrls.chromePasswordsPath))
-                {
-                    MessageBox.Show("Chrome Login Data file not found. Make sure Chrome is installed and used.", "Error", MessageBoxButtons.OK, MessageBoxIcon.Warning);
-                    return;
-                }
-
-                // Copy Chrome's Login Data file to a temp file to prevent file locking
-                string tempLoginDataPath = Path.Combine(Path.GetTempPath(), "LoginDataTemp.db");
-                File.Copy(ConstantUrls.chromePasswordsPath, tempLoginDataPath, true);
+                File.Copy(passwordpath, tempdb, true);
 
                 StringBuilder passwordData = new StringBuilder();
-                byte[] encryptionKey = GetChromeEncryptionKey();
+                byte[] encryptionKey = GetBrowserEncryptionKey(browser);
 
                 // Connect to the copied SQLite database
-                string connectionString = $"Data Source={tempLoginDataPath};Version=3;";
+                string connectionString = $"Data Source={tempdb};Version=3;";
                 using (var connection = new SQLiteConnection(connectionString))
                 {
                     connection.Open();
@@ -759,7 +533,11 @@ namespace Capturebackup
                             string originUrl = reader["origin_url"].ToString();
                             string username = reader["username_value"].ToString();
                             byte[] encryptedPassword = (byte[])reader["password_value"];
-                            string password = DecryptChromePassword(encryptedPassword, encryptionKey);
+                            //string password = browser == "Firefox"
+                            //? DecryptFirefoxPassword(encryptedPassword, encryptionKey)
+                            //: DecryptPassword(encryptedPassword, encryptionKey);
+                            string password = DecryptPassword(encryptedPassword, encryptionKey);
+
                             //DateTime dateCreated = DateTimeOffset.FromUnixTimeMilliseconds(Convert.ToInt64(reader["date_created"])).DateTime;
                             //DateTime dateLastUsed = DateTimeOffset.FromUnixTimeMilliseconds(Convert.ToInt64(reader["date_last_used"])).DateTime;
 
@@ -771,7 +549,7 @@ namespace Capturebackup
                 }
 
                 // Delete the temporary Login Data file after extraction
-                File.Delete(tempLoginDataPath);
+                File.Delete(tempdb);
 
                 // Write captured password data to backup file
                 File.WriteAllText(ConstantUrls.backupPasswordsFilePath, passwordData.ToString());
@@ -786,8 +564,53 @@ namespace Capturebackup
                 MessageBox.Show($"Error capturing passwords: {ex.Message}", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
         }
+        //private string DecryptEdgePassword(byte[] encryptedData, byte[] masterKey)
+        //{
+        //    try
+        //    {
+        //        if (encryptedData == null || encryptedData.Length < 31)
+        //            return null;
 
-        private string DecryptChromePassword(byte[] encryptedData, byte[] masterKey)
+        //        // Check for v10 prefix
+        //        if (encryptedData[0] != 0x76 || encryptedData[1] != 0x31 || encryptedData[2] != 0x30)
+        //        {
+        //            try
+        //            {
+        //                return Encoding.UTF8.GetString(
+        //                    ProtectedData.Unprotect(encryptedData, null, DataProtectionScope.CurrentUser)
+        //                );
+        //            }
+        //            catch
+        //            {
+        //                return "Failed to decrypt (Legacy)";
+        //            }
+        //        }
+
+        //        byte[] nonce = new byte[12];
+        //        byte[] ciphertext = new byte[encryptedData.Length - 31];
+        //        byte[] tag = new byte[16];
+
+        //        Buffer.BlockCopy(encryptedData, 3, nonce, 0, 12);
+        //        Buffer.BlockCopy(encryptedData, 15, ciphertext, 0, encryptedData.Length - 31);
+        //        Buffer.BlockCopy(encryptedData, encryptedData.Length - 16, tag, 0, 16);
+
+        //        byte[] plaintext = new byte[ciphertext.Length];
+
+        //        using (var aesGcm = new AesGcm(masterKey))
+        //        {
+        //            aesGcm.Decrypt(nonce, ciphertext, tag, plaintext);
+        //            return Encoding.UTF8.GetString(plaintext);
+        //        }
+        //    }
+        //    catch (Exception ex)
+        //    {
+        //        Debug.WriteLine($"Edge decryption error: {ex}");
+        //        return $"Edge Decryption failed: {ex.Message}";
+        //    }
+        //}
+
+
+        private string DecryptPassword(byte[] encryptedData, byte[] masterKey)
         {
             try
             {
@@ -835,33 +658,234 @@ namespace Capturebackup
             }
         }
 
-        private byte[] GetChromeEncryptionKey()
+        private byte[] GetBrowserEncryptionKey(string browser)
         {
             try
             {
-                // Read Local State file
-                string localStateContent = File.ReadAllText(ConstantUrls.localStatePath);
+                string localStatePath = browser == "Chrome"
+                    ? ConstantUrls.localStatePath
+                    : ConstantUrls.edgelocalStatePath; // Edge Local State Path
 
-                // Parse JSON
+                string localStateContent = File.ReadAllText(localStatePath);
                 var localState = JsonConvert.DeserializeObject<dynamic>(localStateContent);
                 string base64Key = localState.os_crypt.encrypted_key;
 
-                // Decode base64
                 byte[] encryptedKey = Convert.FromBase64String(base64Key);
-
-                // Remove DPAPI prefix
                 byte[] keyWithoutPrefix = new byte[encryptedKey.Length - 5];
                 Array.Copy(encryptedKey, 5, keyWithoutPrefix, 0, keyWithoutPrefix.Length);
 
-                // Decrypt key using DPAPI
                 return ProtectedData.Unprotect(keyWithoutPrefix, null, DataProtectionScope.CurrentUser);
             }
             catch (Exception ex)
             {
-                Debug.WriteLine($"Error getting encryption key: {ex}");
+                Debug.WriteLine($"Error getting {browser} encryption key: {ex}");
                 return null;
             }
         }
+
+        private void ExtractFirefoxPasswords(string profilePath)
+        {
+            byte[] masterKey = GetFirefoxMasterKey();
+            string loginsJsonPath = ConstantUrls.firefoxPasswordslogin;
+
+            string json = File.ReadAllText(loginsJsonPath);
+            var jsonData = JsonConvert.DeserializeObject<dynamic>(json);
+
+            StringBuilder passwordData = new StringBuilder();
+            foreach (var login in jsonData.logins)
+            {
+                string hostname = login.hostname.ToString();
+                string encryptedUsername = login.encryptedUsername.ToString();
+                string encryptedPassword = login.encryptedPassword.ToString();
+
+                string username = DecryptFirefoxPassword(encryptedUsername, masterKey);
+                string password = DecryptFirefoxPassword(encryptedPassword, masterKey);
+
+                passwordData.AppendLine($"Site: {hostname}\nUsername: {username}\nPassword: {password}\n");
+            }
+
+            File.WriteAllText("Firefox_Passwords.txt", passwordData.ToString());
+            Console.WriteLine("Firefox passwords saved to Firefox_Passwords.txt");
+        }
+
+        private byte[] GetFirefoxMasterKey()
+        {
+            string keyDbPath = ConstantUrls.firefoxkeydb;
+
+            if (!File.Exists(keyDbPath))
+                throw new FileNotFoundException("key4.db not found!");
+
+            byte[] masterKey = null;
+
+            using (var connection = new SQLiteConnection($"Data Source={keyDbPath};Version=3;"))
+            {
+                connection.Open();
+                string sql = "SELECT item1, item2 FROM metadata WHERE id = 'password'";
+
+                using (var command = new SQLiteCommand(sql, connection))
+                using (var reader = command.ExecuteReader())
+                {
+                    if (reader.Read())
+                    {
+                        byte[] globalSalt = (byte[])reader["item1"];
+                        byte[] encryptedKey = (byte[])reader["item2"];
+                        masterKey = DecryptNSSKey(globalSalt, encryptedKey);
+                    }
+                }
+            }
+
+            return masterKey;
+        }
+
+        private static byte[] DecryptNSSKey(byte[] globalSalt, byte[] encryptedKey)
+        {
+            try
+            {
+                // First, we need to extract the actual encrypted key from the ASN.1 structure
+                // Skip the first 26 bytes which contain the ASN.1 header
+                byte[] actualEncryptedKey = new byte[encryptedKey.Length - 26];
+                Array.Copy(encryptedKey, 26, actualEncryptedKey, 0, actualEncryptedKey.Length);
+
+                // Generate the key using PBKDF2
+                byte[] decodedKey = PBKDF2(globalSalt, "password-check", 2000, 32);
+
+                Console.WriteLine($"Actual encrypted key length: {actualEncryptedKey.Length}");
+                Console.WriteLine($"Decoded key length: {decodedKey.Length}");
+
+                // Now decrypt with the correct data
+                byte[] unwrappedKey = AESDecrypt(actualEncryptedKey, decodedKey);
+
+                // The last 8 bytes should be removed from the unwrapped key
+                if (unwrappedKey != null && unwrappedKey.Length > 8)
+                {
+                    byte[] finalKey = new byte[unwrappedKey.Length - 8];
+                    Array.Copy(unwrappedKey, 0, finalKey, 0, finalKey.Length);
+                    return finalKey;
+                }
+                return unwrappedKey;
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error decrypting NSS key: {ex.Message}\nStack trace: {ex.StackTrace}");
+                return null;
+            }
+        }
+
+        private static byte[] PBKDF2(byte[] salt, string password, int iterations, int keyLength)
+        {
+            using (var pbkdf2 = new Rfc2898DeriveBytes(password, salt, iterations, HashAlgorithmName.SHA1))
+            {
+                return pbkdf2.GetBytes(keyLength);
+            }
+        }
+
+        private static byte[] AESDecrypt(byte[] encryptedData, byte[] key)
+        {
+            try
+            {
+                if (encryptedData.Length < 16)
+                {
+                    Console.WriteLine("Encrypted data too short!");
+                    return null;
+                }
+
+                byte[] iv = new byte[16];
+                Array.Copy(encryptedData, 0, iv, 0, 16);
+
+                byte[] cipherText = new byte[encryptedData.Length - 16];
+                Array.Copy(encryptedData, 16, cipherText, 0, cipherText.Length);
+
+                // Ensure the ciphertext length is a multiple of 16 (AES block size)
+                if (cipherText.Length % 16 != 0)
+                {
+                    Console.WriteLine($"Warning: Ciphertext length ({cipherText.Length}) is not a multiple of 16");
+                    // Add PKCS7 padding manually if needed
+                    int paddingLength = 16 - (cipherText.Length % 16);
+                    byte[] paddedCipherText = new byte[cipherText.Length + paddingLength];
+                    Array.Copy(cipherText, paddedCipherText, cipherText.Length);
+                    for (int i = cipherText.Length; i < paddedCipherText.Length; i++)
+                    {
+                        paddedCipherText[i] = (byte)paddingLength;
+                    }
+                    cipherText = paddedCipherText;
+                }
+
+                using (Aes aes = Aes.Create())
+                {
+                    aes.Key = key;
+                    aes.IV = iv;
+                    aes.Mode = CipherMode.CBC;
+                    aes.Padding = PaddingMode.None;
+
+                    using (ICryptoTransform decryptor = aes.CreateDecryptor(aes.Key, aes.IV))
+                    {
+                        return decryptor.TransformFinalBlock(cipherText, 0, cipherText.Length);
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"AES decryption failed: {ex.Message}\nStacktrace: {ex.StackTrace}");
+                return null;
+            }
+        }
+
+
+        private List<(string site, string username, string password)> GetFirefoxPasswords(string profilePath, byte[] masterKey)
+        {
+            string loginsJsonPath = Path.Combine(profilePath, "logins.json");
+            if (!File.Exists(loginsJsonPath))
+                throw new FileNotFoundException("logins.json not found!");
+
+            List<(string site, string username, string password)> passwords = new List<(string, string, string)>();
+            string json = File.ReadAllText(loginsJsonPath);
+            var jsonData = JsonConvert.DeserializeObject<dynamic>(json);
+
+            foreach (var login in jsonData.logins)
+            {
+                string hostname = login.hostname.ToString();
+                string encryptedUsername = login.encryptedUsername.ToString();
+                string encryptedPassword = login.encryptedPassword.ToString();
+
+                string username = DecryptFirefoxPassword(encryptedUsername, masterKey);
+                string password = DecryptFirefoxPassword(encryptedPassword, masterKey);
+
+                passwords.Add((hostname, username, password));
+            }
+
+            return passwords;
+        }
+
+        private string DecryptFirefoxPassword(string encryptedData, byte[] masterKey)
+        {
+            byte[] encryptedBytes = Convert.FromBase64String(encryptedData);
+
+            try
+            {
+                using (var aes = new AesGcm(masterKey))
+                {
+                    byte[] nonce = new byte[12];
+                    byte[] ciphertext = new byte[encryptedBytes.Length - 16];
+                    byte[] tag = new byte[16];
+
+                    Buffer.BlockCopy(encryptedBytes, 0, nonce, 0, 12);
+                    Buffer.BlockCopy(encryptedBytes, 12, ciphertext, 0, encryptedBytes.Length - 16);
+                    Buffer.BlockCopy(encryptedBytes, encryptedBytes.Length - 16, tag, 0, 16);
+
+                    byte[] plaintext = new byte[ciphertext.Length];
+                    aes.Decrypt(nonce, ciphertext, tag, plaintext);
+
+                    return Encoding.UTF8.GetString(plaintext);
+                }
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"Error decrypting Firefox password: {ex}");
+                return "Decryption Failed";
+            }
+        }
+
+
 
         private void RestorePasswordsFromBackup()
         {
@@ -969,7 +993,8 @@ namespace Capturebackup
                     return;
                 }
 
-                byte[] encryptionKey = GetChromeEncryptionKey();
+                //byte[] encryptionKey = GetChromeEncryptionKey();
+                byte[] encryptionKey = null;
                 if (encryptionKey == null)
                 {
                     MessageBox.Show("Failed to get encryption key.", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
@@ -1238,5 +1263,7 @@ namespace Capturebackup
         }
 
         #endregion region
+
+
     }
 }
